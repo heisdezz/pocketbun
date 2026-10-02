@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Create collections directly from TypeScript with the exported `Collection`, `newCollection`, `newBaseCollection`, `newAuthCollection`, and `newViewCollection` APIs.
+
 ## 0.40.4-pocketbun.0 - 2026-09-13
 
 - Now compatible with PocketBase `v0.40.4` [release notes](https://github.com/pocketbase/pocketbase/releases/tag/v0.40.4) (upstream commit `5cec579d`).

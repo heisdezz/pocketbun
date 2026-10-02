@@ -39,11 +39,15 @@ await writeFile(
 await writeFile(
   join(fixtureRoot, "index.ts"),
   [
-    'import { BaseApp, PocketBase, serveAsync, type PocketBaseConfig } from "pocketbun";',
+    'import { BaseApp, PocketBase, Collection, newCollection, newBaseCollection, newAuthCollection, newViewCollection, serveAsync, type CollectionInit, type PocketBaseConfig } from "pocketbun";',
     "",
     "const config: PocketBaseConfig = { DefaultDev: true };",
     "const pb = new PocketBase(config);",
     "const app = new BaseApp({ dataDir: 'pb_data' });",
+    "const collectionConfig: CollectionInit = { name: 'media', type: 'base' };",
+    "const collections: Collection[] = [new Collection(collectionConfig), newCollection('base', 'media'), newBaseCollection('media'), newAuthCollection('members'), newViewCollection('stats')];",
+    "collections[0]!.fields.addMarshaledJSON(JSON.stringify([{ name: 'title', type: 'text', required: true }]));",
+    "void app.save(collections[0]!);",
     "void serveAsync(app, { httpAddr: '127.0.0.1:0' });",
     "void pb;",
     "",

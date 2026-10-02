@@ -53,6 +53,36 @@ bun run server.ts
 
 Then visit `http://127.0.0.1:8090/_/` for the Admin UI and `http://127.0.0.1:8090/api/health` for a basic API response.
 
+### Create collections from TypeScript
+
+Collection constructors and factories are available directly from the package; hooks and migration globals aren't required:
+
+```ts
+import { BaseApp, newBaseCollection, serveAsync } from "pocketbun";
+
+const app = new BaseApp({ dataDir: "pb_data" });
+await app.bootstrapAsync();
+app.runAppMigrations();
+
+// Only create the collection when it doesn't already exist.
+if (!app.findAllCollections().some((collection) => collection.name === "media")) {
+  const media = newBaseCollection("media");
+  media.fields.addMarshaledJSON(JSON.stringify([
+    { name: "title", type: "text", required: true },
+    { name: "url", type: "url" },
+    { name: "created", type: "autodate", onCreate: true },
+    { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
+  ]));
+
+  const error = await app.save(media);
+  if (error) throw error;
+}
+
+await serveAsync(app, { httpAddr: "127.0.0.1:8090" });
+```
+
+`newAuthCollection(name, id?)` and `newViewCollection(name, id?)` initialize the corresponding collection defaults. `newCollection(type, name, id?)` selects a factory by type. `Collection` and its `CollectionInit` type are also exported for direct construction. Collection rules default to `null` (superuser-only access); set rules explicitly when enabling client access. For versioned schema changes, migrations remain the recommended approach.
+
 ## Vertical Scaling
 
 For read-heavy deployments with spare CPU capacity, add `workers` to your custom server:
