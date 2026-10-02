@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Run the GitHub Release workflow without a tag to automatically prepare the next PocketBun revision, date its changelog, and push the release commit and tag together.
 - Import all field constructors and `Record` directly from TypeScript, with typed field options and a typed model API returned by `bindCore({})`.
 - Release workflow now validates that an existing PocketBun release tag was selected before checking it out, with clear errors for missing or PocketBase-only tags.
 - Create collections directly from TypeScript with the exported `Collection`, `newCollection`, `newBaseCollection`, `newAuthCollection`, and `newViewCollection` APIs.

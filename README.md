@@ -194,6 +194,12 @@ All differences to PocketBase are documented [here](https://pekeler.github.io/po
 - operational differences (thumbnails, logs, templates, SQL helpers)
 - intentionally unsupported PocketBase documentation topics
 
+## GitHub Releases
+
+Open **Actions → Release → Run workflow**, select `master`, and leave **tag** blank. The workflow prepares the next `X.Y.Z-pocketbun.N` revision from the current package version and existing tags, moves the Unreleased notes into a dated release section, updates the docs version, and pushes the version commit and tag together before creating the GitHub Release. Keep release notes under `## Unreleased` for each new release. A retry with no new notes reuses the current tagged release.
+
+To republish an existing release, provide its full PocketBun tag instead. This workflow creates GitHub Releases; npm publishing remains a separate step.
+
 ## Development Setup
 
 If you want to contribute after cloning from GitHub:

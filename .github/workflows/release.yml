@@ -7,12 +7,16 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing PocketBun release tag (for example v0.40.4-pocketbun.0; not a PocketBase tag)"
-        required: true
+        description: "Leave blank to generate the next PocketBun release, or enter an existing PocketBun tag to republish it"
+        required: false
         type: string
 
 permissions:
   contents: write
+
+concurrency:
+  group: pocketbun-release
+  cancel-in-progress: false
 
 jobs:
   github-release:
@@ -24,13 +28,47 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Bun for automatic release
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Generate release version and tag
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
+        env:
+          RELEASE_BRANCH: ${{ github.ref_name }}
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+        run: |
+          set -euo pipefail
+          if [[ "${RELEASE_REF_TYPE}" != "branch" ]]; then
+            echo "::error::Select a branch when generating a release automatically."
+            exit 1
+          fi
+          git fetch origin "${RELEASE_BRANCH}" --tags
+          git merge --ff-only "origin/${RELEASE_BRANCH}"
+          tag_name="$(bun run scripts/prepare_github_release.ts)"
+          bun run docs:version
+          bun run check:versions
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json CHANGELOG.md docs/_data/pocketbun.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: release ${tag_name#v}"
+          fi
+          if ! git show-ref --verify --quiet "refs/tags/${tag_name}"; then
+            git tag "${tag_name}"
+            git push --atomic origin "HEAD:refs/heads/${RELEASE_BRANCH}" "refs/tags/${tag_name}"
+          fi
+          echo "TAG_NAME=${tag_name}" >> "$GITHUB_ENV"
+
       - name: Validate and check out release tag
         env:
           INPUT_TAG: ${{ inputs.tag }}
           REF_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          tag_name="${INPUT_TAG:-$REF_TAG}"
+          tag_name="${TAG_NAME:-${INPUT_TAG:-$REF_TAG}}"
           if [[ ! "${tag_name}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-pocketbun\.[0-9]+$ ]]; then
             echo "::error::Use an existing PocketBun tag such as v0.40.4-pocketbun.0, not a PocketBase tag or branch: '${tag_name}'."
             exit 1
@@ -48,7 +86,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          tag_name="${INPUT_TAG:-$REF_TAG}"
+          tag_name="${TAG_NAME:-${INPUT_TAG:-$REF_TAG}}"
           if [[ -z "${tag_name}" ]]; then
             echo "Missing release tag name." >&2
             exit 1
