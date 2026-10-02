@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (for example v0.36.2-pocketbun.6)"
+        description: "Existing PocketBun release tag (for example v0.40.4-pocketbun.0; not a PocketBase tag)"
         required: true
         type: string
 
@@ -22,7 +22,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate and check out release tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag_name="${INPUT_TAG:-$REF_TAG}"
+          if [[ ! "${tag_name}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-pocketbun\.[0-9]+$ ]]; then
+            echo "::error::Use an existing PocketBun tag such as v0.40.4-pocketbun.0, not a PocketBase tag or branch: '${tag_name}'."
+            exit 1
+          fi
+          if ! git show-ref --verify --quiet "refs/tags/${tag_name}"; then
+            echo "::error::Release tag '${tag_name}' does not exist in this fork. Create and push the intended version tag before running Release."
+            exit 1
+          fi
+          git checkout --detach "refs/tags/${tag_name}"
 
       - name: Build release notes from changelog
         env:

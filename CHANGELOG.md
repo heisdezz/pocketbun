@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Import all field constructors and `Record` directly from TypeScript, with typed field options and a typed model API returned by `bindCore({})`.
+- Release workflow now validates that an existing PocketBun release tag was selected before checking it out, with clear errors for missing or PocketBase-only tags.
 - Create collections directly from TypeScript with the exported `Collection`, `newCollection`, `newBaseCollection`, `newAuthCollection`, and `newViewCollection` APIs.
 
 ## 0.40.4-pocketbun.0 - 2026-09-13

@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, relative, sep, normalize } from "node:path";
 import type { App } from "../../core/app.ts";
 import type { ServeEvent } from "../../core/events.ts";
+import type { Field } from "../../core/field.ts";
 import { Static } from "../../apis/base.ts";
 import {
   RequireAuth,
@@ -48,22 +49,15 @@ import {
   NewViewCollection,
 } from "../../core/collection_model.ts";
 import { RequestInfoContextDefault, type RequestInfo as RequestInfoShape } from "../../core/event_request.ts";
-import { AutodateField } from "../../core/field_autodate.ts";
-import { BoolField } from "../../core/field_bool.ts";
-import { DateField } from "../../core/field_date.ts";
-import { EditorField } from "../../core/field_editor.ts";
-import { EmailField } from "../../core/field_email.ts";
 import { FileField } from "../../core/field_file.ts";
-import { GeoPointField } from "../../core/field_geo_point.ts";
-import { JSONField } from "../../core/field_json.ts";
 import { installFieldJSVMAliases } from "../../core/field_jsvm_aliases.ts";
-import { NumberField } from "../../core/field_number.ts";
-import { PasswordField } from "../../core/field_password.ts";
-import { RelationField } from "../../core/field_relation.ts";
-import { SelectField } from "../../core/field_select.ts";
-import { TextField } from "../../core/field_text.ts";
-import { URLField } from "../../core/field_url.ts";
 import { FieldsList, NewFieldsList } from "../../core/fields_list.ts";
+import {
+  fieldConstructors,
+  assignStructValues,
+  Record as PublicRecord,
+  type FieldConstructors,
+} from "../../core/model_constructors.ts";
 import { Record as RecordModel } from "../../core/record_model.ts";
 import { AppleClientSecretCreate } from "../../forms/apple_client_secret_create.ts";
 import { RecordUpsert } from "../../forms/record_upsert.ts";
@@ -1692,38 +1686,7 @@ function normalizeMailerAddressList(raw: unknown): MailerAddress[] {
   return [normalizeMailerAddress(raw)];
 }
 
-function assignStructValues(target: Record<string, unknown>, values: Record<string, unknown>): void {
-  for (const [key, value] of Object.entries(values)) {
-    if (key in target) {
-      if (typeof target[key] === "function") {
-        continue;
-      }
-      target[key] = value;
-      continue;
-    }
-    const candidate = `${key.slice(0, 1).toUpperCase()}${key.slice(1)}`;
-    if (candidate in target) {
-      if (typeof (target as Record<string, unknown>)[candidate] === "function") {
-        continue;
-      }
-      (target as Record<string, unknown>)[candidate] = value;
-      continue;
-    }
-    target[key] = value;
-  }
-}
-
 type StructCtor = new (...args: any[]) => object;
-
-function wrapFieldCtor(Ctor: StructCtor): StructCtor {
-  return class extends Ctor {
-    constructor(...args: unknown[]) {
-      super(...args);
-      const values = (args[0] ?? {}) as Record<string, unknown>;
-      assignStructValues(this as Record<string, unknown>, values);
-    }
-  } as StructCtor;
-}
 
 function wrapStructCtor(Ctor: StructCtor): StructCtor {
   return class extends Ctor {
@@ -1740,7 +1703,8 @@ function wrapFactory<T extends (...args: any[]) => object>(factory: T): T {
   } as unknown as T;
 }
 
-export function baseBinds(target: BindTarget): void {
+export function baseBinds<T extends BindTarget>(target: T): T & CoreBindings;
+export function baseBinds(target: BindTarget): BindTarget & CoreBindings {
   installFieldJSVMAliases();
 
   target.readerToString = (reader: unknown, maxBytes = DefaultMaxBodySize): string => {
@@ -1830,20 +1794,7 @@ export function baseBinds(target: BindTarget): void {
   target.newBaseCollection = (name: string, ...optId: string[]): Collection => NewBaseCollection(name, optId[0] ?? "");
   target.newViewCollection = (name: string, ...optId: string[]): Collection => NewViewCollection(name, optId[0] ?? "");
   target.newAuthCollection = (name: string, ...optId: string[]): Collection => NewAuthCollection(name, optId[0] ?? "");
-  target.NumberField = wrapFieldCtor(NumberField);
-  target.BoolField = wrapFieldCtor(BoolField);
-  target.TextField = wrapFieldCtor(TextField);
-  target.URLField = wrapFieldCtor(URLField);
-  target.EmailField = wrapFieldCtor(EmailField);
-  target.EditorField = wrapFieldCtor(EditorField);
-  target.PasswordField = wrapFieldCtor(PasswordField);
-  target.DateField = wrapFieldCtor(DateField);
-  target.AutodateField = wrapFieldCtor(AutodateField);
-  target.JSONField = wrapFieldCtor(JSONField);
-  target.RelationField = wrapFieldCtor(RelationField);
-  target.SelectField = wrapFieldCtor(SelectField);
-  target.FileField = wrapFieldCtor(FileField);
-  target.GeoPointField = wrapFieldCtor(GeoPointField);
+  Object.assign(target, fieldConstructors);
   target.MailerMessage = class MailerMessage {
     From: MailerAddress = normalizeMailerAddress(null);
     To: MailerAddress[] = [];
@@ -2098,6 +2049,7 @@ export function baseBinds(target: BindTarget): void {
       super(values.name ?? "", raw);
     }
   };
+  return target as BindTarget & CoreBindings;
 }
 
 function createDynamicModelWithShape(shape: Record<string, string>): Record<string, unknown> {
@@ -3004,6 +2956,19 @@ export function routerBinds(app: App, target: BindTarget): void {
       return e.Next();
     });
   };
+}
+
+// This shape covers the model constructors and factories installed by BindCore.
+// Other runtime bindings remain available on explicitly provided target shapes.
+export interface CoreBindings extends FieldConstructors {
+  Collection: new (values?: Record<string, unknown>) => Collection;
+  Record: new (collection?: Collection, data?: Record<string, unknown>) => PublicRecord;
+  FieldsList: new (values?: unknown[]) => FieldsList;
+  Field: new (values?: Record<string, unknown>) => Field;
+  newCollection: typeof NewCollection;
+  newBaseCollection: typeof NewBaseCollection;
+  newAuthCollection: typeof NewAuthCollection;
+  newViewCollection: typeof NewViewCollection;
 }
 
 export const BindCore = baseBinds;

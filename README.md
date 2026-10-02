@@ -58,7 +58,7 @@ Then visit `http://127.0.0.1:8090/_/` for the Admin UI and `http://127.0.0.1:809
 Collection constructors and factories are available directly from the package; hooks and migration globals aren't required:
 
 ```ts
-import { BaseApp, newBaseCollection, serveAsync } from "pocketbun";
+import { BaseApp, newBaseCollection, TextField, URLField, AutodateField, Record, serveAsync } from "pocketbun";
 
 const app = new BaseApp({ dataDir: "pb_data" });
 await app.bootstrapAsync();
@@ -67,12 +67,12 @@ app.runAppMigrations();
 // Only create the collection when it doesn't already exist.
 if (!app.findAllCollections().some((collection) => collection.name === "media")) {
   const media = newBaseCollection("media");
-  media.fields.addMarshaledJSON(JSON.stringify([
-    { name: "title", type: "text", required: true },
-    { name: "url", type: "url" },
-    { name: "created", type: "autodate", onCreate: true },
-    { name: "updated", type: "autodate", onCreate: true, onUpdate: true },
-  ]));
+  media.fields.add(
+    new TextField({ name: "title", required: true }),
+    new URLField({ name: "url" }),
+    new AutodateField({ name: "created", onCreate: true }),
+    new AutodateField({ name: "updated", onCreate: true, onUpdate: true }),
+  );
 
   const error = await app.save(media);
   if (error) throw error;
@@ -82,6 +82,31 @@ await serveAsync(app, { httpAddr: "127.0.0.1:8090" });
 ```
 
 `newAuthCollection(name, id?)` and `newViewCollection(name, id?)` initialize the corresponding collection defaults. `newCollection(type, name, id?)` selects a factory by type. `Collection` and its `CollectionInit` type are also exported for direct construction. Collection rules default to `null` (superuser-only access); set rules explicitly when enabling client access. For versioned schema changes, migrations remain the recommended approach.
+
+The package exports all 14 field constructors, with typed lower-camel options matching the hooks runtime (`TextField`, `NumberField`, `BoolField`, `URLField`, `EmailField`, `EditorField`, `PasswordField`, `DateField`, `AutodateField`, `JSONField`, `RelationField`, `SelectField`, `FileField`, and `GeoPointField`). Upstream uppercase option names also work.
+
+Use `new Record(collection, data?)` to construct a new record, then persist it with `await app.save(record)`:
+
+```ts
+const media = app.findCollectionByNameOrId("media");
+const record = new Record(media, { title: "Example", url: "https://example.com" });
+const error = await app.save(record);
+if (error) throw error;
+```
+
+For code using the bindings API, use the returned typed model shape:
+
+```ts
+import { bindCore } from "pocketbun";
+
+const core = bindCore({});
+const media = core.newBaseCollection("media");
+media.fields.add(new core.TextField({ name: "title", required: true }));
+const record = new core.Record(media);
+record.set("title", "Example");
+```
+
+`bindCore(target)` still mutates its target and now returns it with typed model constructors and factories. Additional runtime bindings keep their existing behavior.
 
 ## Vertical Scaling
 
